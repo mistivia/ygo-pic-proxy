@@ -19,7 +19,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Database.SQLite.Simple (Connection, Only (..), execute, execute_, open, query)
-import Network.HTTP.Client (Manager, httpLbs, parseRequest, responseBody, responseStatus)
+import Network.HTTP.Client (Manager, httpLbs, parseRequest, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (newTlsManager)
 import Network.HTTP.Types (status200, status404, status500)
 import Network.Wai (Application, Response, ResponseReceived, pathInfo, responseFile, responseLBS)
@@ -87,7 +87,7 @@ handleImage st cid respond = do
                 Right DownloadHttpError -> respond (responseLBS status500 [] "internal error")
                 Right DownloadOk -> do
                   let jpgFile = "tmp" </> (cid ++ ".jpg")
-                  conv <- try (callProcess "convert" [webpFile, jpgFile]) :: IO (Either SomeException ())
+                  conv <- try (callProcess "magick" [webpFile, jpgFile]) :: IO (Either SomeException ())
                   case conv of
                     Left _ -> respond (responseLBS status500 [] "internal error")
                     Right () -> do
@@ -99,7 +99,8 @@ data DownloadResult = DownloadOk | DownloadNotFound | DownloadHttpError
 
 downloadWebp :: Manager -> String -> FilePath -> IO DownloadResult
 downloadWebp mgr cid dest = do
-  req <- parseRequest ("https://cdn.233.momobako.com/ygoimg/ygopro/" ++ cid ++ ".webp")
+  req0 <- parseRequest ("https://cdn.233.momobako.com/ygoimg/ygopro/" ++ cid ++ ".webp")
+  let req = req0 { responseTimeout = responseTimeoutMicro 30000000 }
   resp <- httpLbs req mgr
   let st = responseStatus resp
   if st == status404
