@@ -3,3 +3,8 @@ dist-newstyle/
 .ghc.environment.*
 *.hi
 *.o
+ygo-pic-proxy.db
+ygo-pic-proxy.db-wal
+ygo-pic-proxy.db-shm
+cache/
+tmp/

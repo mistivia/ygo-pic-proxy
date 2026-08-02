@@ -7,7 +7,20 @@ license:            ISC
 library
     hs-source-dirs:     src
     exposed-modules:    YgoPicProxy
-    build-depends:      base >= 4.14 && < 5
+    build-depends:
+        base >= 4.14 && < 5,
+        bytestring,
+        containers,
+        directory,
+        filepath,
+        http-client,
+        http-client-tls,
+        http-types,
+        process,
+        sqlite-simple,
+        text,
+        time,
+        wai
     default-language:   GHC2024
 
 executable ygo-pic-proxy
@@ -15,7 +28,9 @@ executable ygo-pic-proxy
     hs-source-dirs:   app
     build-depends:
         base >= 4.14 && < 5,
-        ygo-pic-proxy
+        ygo-pic-proxy,
+        wai,
+        warp
     default-language:   GHC2024
     ghc-options:      -Wall
 
@@ -26,5 +41,6 @@ test-suite test
     build-depends:
         base >= 4.14 && < 5,
         HUnit,
-        ygo-pic-proxy
+        ygo-pic-proxy,
+        text
     default-language:   GHC2024
