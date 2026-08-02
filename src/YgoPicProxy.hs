@@ -9,7 +9,7 @@ module YgoPicProxy
   ) where
 
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
-import Control.Exception (IOException, SomeException, catch, try)
+import Control.Exception (IOException, SomeException, bracket, bracketOnError, catch, finally, try)
 import Control.Monad (forever)
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isDigit)
@@ -71,41 +71,43 @@ handleImage st cid respond = do
       mTs <- getNotExist (asDb st) cid
       case mTs of
         Just ts | now - ts < 3600 -> respond (responseLBS status404 [] "not found")
-        _ -> do
-          tmpDir <- getTemporaryDirectory
-          (webpFile, webpHandle) <- openTempFile tmpDir ("ygo-" ++ cid ++ ".webp")
-          hClose webpHandle
+        _ -> withTempFile ("ygo-" ++ cid ++ ".webp") $ \webpFile -> do
           dl <- try (downloadWebp (asManager st) cid webpFile) :: IO (Either SomeException DownloadResult)
           case dl of
-            Left _ -> do
-              removeQuietly webpFile
-              respond (responseLBS status500 [] "internal error")
+            Left _ -> respond (responseLBS status500 [] "internal error")
             Right DownloadNotFound -> do
-              removeQuietly webpFile
               setNotExist (asDb st) cid now
               respond (responseLBS status404 [] "not found")
-            Right DownloadHttpError -> do
-              removeQuietly webpFile
-              respond (responseLBS status500 [] "internal error")
-            Right DownloadOk -> do
-              (jpgFile, jpgHandle) <- openTempFile tmpDir ("ygo-" ++ cid ++ ".jpg")
-              hClose jpgHandle
-              conv <- try (callProcess "magick" [webpFile, jpgFile]) :: IO (Either SomeException ())
-              removeQuietly webpFile
-              case conv of
-                Left _ -> do
-                  removeQuietly jpgFile
-                  respond (responseLBS status500 [] "internal error")
-                Right () -> do
-                  img <- BL.readFile jpgFile
-                  writeChan (asChan st) (cid, jpgFile)
-                  respond (responseLBS status200 [("Content-Type", "image/jpeg")] img)
-    removeQuietly :: FilePath -> IO ()
-    removeQuietly p = removeFile p `catch` ignoreIO
-    ignoreIO :: IOException -> IO ()
-    ignoreIO _ = pure ()
+            Right DownloadHttpError -> respond (responseLBS status500 [] "internal error")
+            Right DownloadOk ->
+              withTempFileOnError ("ygo-" ++ cid ++ ".jpg") $ \jpgFile -> do
+                callProcess "magick" [webpFile, jpgFile]
+                img <- BL.readFile jpgFile
+                writeChan (asChan st) (cid, jpgFile)
+                respond (responseLBS status200 [("Content-Type", "image/jpeg")] img)
+              `catch` \(_ :: SomeException) ->
+                respond (responseLBS status500 [] "internal error")
 
 data DownloadResult = DownloadOk | DownloadNotFound | DownloadHttpError
+
+ignoreIO :: IOException -> IO ()
+ignoreIO _ = pure ()
+
+removeQuietly :: FilePath -> IO ()
+removeQuietly p = removeFile p `catch` ignoreIO
+
+acquireTempFile :: String -> IO FilePath
+acquireTempFile template = do
+  tmpDir <- getTemporaryDirectory
+  (p, h) <- openTempFile tmpDir template
+  hClose h
+  pure p
+
+withTempFile :: String -> (FilePath -> IO a) -> IO a
+withTempFile template = bracket (acquireTempFile template) removeQuietly
+
+withTempFileOnError :: String -> (FilePath -> IO a) -> IO a
+withTempFileOnError template = bracketOnError (acquireTempFile template) removeQuietly
 
 downloadWebp :: Manager -> String -> FilePath -> IO DownloadResult
 downloadWebp mgr cid dest = do
@@ -136,15 +138,11 @@ worker :: AppState -> IO ()
 worker st = forever $ do
   (cid, tmpJpg) <- readChan (asChan st)
   let cacheJpg = "cache" </> (cid ++ ".jpg")
-  exists <- doesFileExist cacheJpg
-  if exists
-    then removeQuietly tmpJpg
-    else copyFile tmpJpg cacheJpg `catch` ignoreIO >> removeQuietly tmpJpg
-  where
-    removeQuietly :: FilePath -> IO ()
-    removeQuietly p = removeFile p `catch` ignoreIO
-    ignoreIO :: IOException -> IO ()
-    ignoreIO _ = pure ()
+  (do exists <- doesFileExist cacheJpg
+      if exists
+        then pure ()
+        else copyFile tmpJpg cacheJpg `catch` ignoreIO)
+    `finally` removeQuietly tmpJpg
 
 parseId :: Text -> Maybe String
 parseId name = do
