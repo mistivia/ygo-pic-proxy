@@ -10,3 +10,4 @@ cache/
 tmp/
 result
 config.ini
+.basher/

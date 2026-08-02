@@ -117,12 +117,11 @@ downloadWebp mgr cid dest = do
   let st = responseStatus resp
   if st == status404 then
     pure DownloadNotFound
-  else
-    if st /= status200 then
-      pure DownloadHttpError
-    else do
-      BL.writeFile dest (responseBody resp)
-      pure DownloadOk
+  else if st /= status200 then
+    pure DownloadHttpError
+  else do
+    BL.writeFile dest (responseBody resp)
+    pure DownloadOk
 
 getNotExist :: Connection -> String -> IO (Maybe Integer)
 getNotExist conn cid = do
