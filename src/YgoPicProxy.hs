@@ -94,7 +94,7 @@ ignoreIO :: IOException -> IO ()
 ignoreIO _ = pure ()
 
 removeQuietly :: FilePath -> IO ()
-removeQuietly p = removeFile p `catch` ignoreIO
+removeQuietly p = catch (removeFile p)  ignoreIO
 
 acquireTempFile :: String -> IO FilePath
 acquireTempFile template = do
@@ -115,13 +115,14 @@ downloadWebp mgr cid dest = do
   let req = req0 { responseTimeout = responseTimeoutMicro 30000000 }
   resp <- httpLbs req mgr
   let st = responseStatus resp
-  if st == status404
-    then pure DownloadNotFound
-    else if st /= status200
-      then pure DownloadHttpError
-      else do
-        BL.writeFile dest (responseBody resp)
-        pure DownloadOk
+  if st == status404 then
+    pure DownloadNotFound
+  else
+    if st /= status200 then
+      pure DownloadHttpError
+    else do
+      BL.writeFile dest (responseBody resp)
+      pure DownloadOk
 
 getNotExist :: Connection -> String -> IO (Maybe Integer)
 getNotExist conn cid = do
@@ -137,12 +138,11 @@ setNotExist conn cid ts =
 worker :: AppState -> IO ()
 worker st = forever $ do
   (cid, tmpJpg) <- readChan (asChan st)
-  let cacheJpg = "cache" </> (cid ++ ".jpg")
-  (do exists <- doesFileExist cacheJpg
-      if exists
-        then pure ()
-        else copyFile tmpJpg cacheJpg `catch` ignoreIO)
-    `finally` removeQuietly tmpJpg
+  flip finally (removeQuietly tmpJpg) $ do
+    let cacheJpg = "cache" </> (cid ++ ".jpg")
+    exists <- doesFileExist cacheJpg
+    if exists then pure ()
+    else catch (copyFile tmpJpg cacheJpg) ignoreIO
 
 parseId :: Text -> Maybe String
 parseId name = do

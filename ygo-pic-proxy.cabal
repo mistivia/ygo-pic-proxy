@@ -46,3 +46,25 @@ test-suite test
         ygo-pic-proxy,
         text
     default-language:   GHC2024
+
+
+test-suite integration
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     test
+    main-is:            Integration.hs
+    build-depends:
+        base >= 4.14 && < 5,
+        bytestring,
+        directory,
+        filepath,
+        http-client,
+        http-client-tls,
+        http-types,
+        HUnit,
+        network,
+        sqlite-simple,
+        time,
+        wai,
+        warp,
+        ygo-pic-proxy
+    default-language:   GHC2024
