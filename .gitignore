@@ -9,3 +9,4 @@ ygo-pic-proxy.db-shm
 cache/
 tmp/
 result
+config.ini
