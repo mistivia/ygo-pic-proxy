@@ -71,35 +71,40 @@ handleImage st cid respond = do
       cached' <- doesFileExist cacheFile
       if cached'
         then respond (responseFile status200 [("Content-Type", "image/jpeg")] cacheFile Nothing)
-        else do
-          now <- floor <$> getPOSIXTime
-          mTs <- getNotExist (asDb st) cid
-          case mTs of
-            Just ts | now - ts < 3600 -> respond (responseLBS status404 [] "not found")
-            _ -> do
-              let webpFile = "tmp" </> (cid ++ ".webp")
-              dl <- try (downloadWebp (asManager st) cid webpFile) :: IO (Either SomeException DownloadResult)
-              case dl of
-                Left _ -> respond (responseLBS status500 [] "internal error")
-                Right DownloadNotFound -> do
-                  setNotExist (asDb st) cid now
-                  respond (responseLBS status404 [] "not found")
-                Right DownloadHttpError -> respond (responseLBS status500 [] "internal error")
-                Right DownloadOk -> do
-                  let jpgFile = "tmp" </> (cid ++ ".jpg")
-                  conv <- try (callProcess "magick" [webpFile, jpgFile]) :: IO (Either SomeException ())
-                  case conv of
-                    Left _ -> respond (responseLBS status500 [] "internal error")
-                    Right () -> do
-                      img <- BL.readFile jpgFile
-                      writeChan (asChan st) jpgFile
-                      respond (responseLBS status200 [("Content-Type", "image/jpeg")] img)
+        else fetchMissing
+  where
+    fetchMissing :: IO ResponseReceived
+    fetchMissing = do
+      now <- floor <$> getPOSIXTime
+      mTs <- getNotExist (asDb st) cid
+      case mTs of
+        Just ts | now - ts < 3600 -> respond (responseLBS status404 [] "not found")
+        _ -> do
+          let webpFile = "tmp" </> (cid ++ ".webp")
+          dl <- try (downloadWebp (asManager st) cid webpFile) :: IO (Either SomeException DownloadResult)
+          case dl of
+            Left _ -> respond (responseLBS status500 [] "internal error")
+            Right DownloadNotFound -> do
+              setNotExist (asDb st) cid now
+              respond (responseLBS status404 [] "not found")
+            Right DownloadHttpError -> respond (responseLBS status500 [] "internal error")
+            Right DownloadOk -> convertAndServe webpFile
+    convertAndServe :: FilePath -> IO ResponseReceived
+    convertAndServe webpFile = do
+      let jpgFile = "tmp" </> (cid ++ ".jpg")
+      conv <- try (callProcess "magick" [webpFile, jpgFile]) :: IO (Either SomeException ())
+      case conv of
+        Left _ -> respond (responseLBS status500 [] "internal error")
+        Right () -> do
+          img <- BL.readFile jpgFile
+          writeChan (asChan st) jpgFile
+          respond (responseLBS status200 [("Content-Type", "image/jpeg")] img)
 
 data DownloadResult = DownloadOk | DownloadNotFound | DownloadHttpError
 
 downloadWebp :: Manager -> String -> FilePath -> IO DownloadResult
 downloadWebp mgr cid dest = do
-  req0 <- parseRequest ("https://cdn.233.momobako.com/ygoimg/ygopro/" ++ cid ++ ".webp")
+  req0 <- parseRequest ("https://cdn.233.momobako.com/ygoimg/ygopro/" ++ cid ++ ".webp!/format/webp/fw/400/quality/85")
   let req = req0 { responseTimeout = responseTimeoutMicro 30000000 }
   resp <- httpLbs req mgr
   let st = responseStatus resp
