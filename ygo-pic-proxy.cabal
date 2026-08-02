@@ -1,0 +1,30 @@
+cabal-version:      3.0
+name:               ygo-pic-proxy
+version:            0.1.0.0
+build-type:         Simple
+license:            ISC
+
+library
+    hs-source-dirs:     src
+    exposed-modules:    YgoPicProxy
+    build-depends:      base >= 4.14 && < 5
+    default-language:   GHC2024
+
+executable ygo-pic-proxy
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    build-depends:
+        base >= 4.14 && < 5,
+        ygo-pic-proxy
+    default-language:   GHC2024
+    ghc-options:      -Wall
+
+test-suite test
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     test
+    main-is:            Spec.hs
+    build-depends:
+        base >= 4.14 && < 5,
+        HUnit,
+        ygo-pic-proxy
+    default-language:   GHC2024
