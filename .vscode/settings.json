@@ -1,4 +1,0 @@
-{
-    "haskell.manageHLS": "PATH",
-    "haskell.serverExecutablePath": "${workspaceFolder}/.vscode/hls-wrapper.sh"
-}
