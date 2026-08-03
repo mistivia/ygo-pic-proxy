@@ -43,6 +43,6 @@ parseSettings ini = do
 parsePort :: T.Text -> Either String Port
 parsePort t =
   case TR.decimal (T.strip t) of
-    Right (n, rest)
+    Right (n :: Integer, rest)
       | T.null (T.strip rest) && n > 0 && n <= 65535 -> Right (fromIntegral n)
     _ -> Left $ "invalid port: " ++ T.unpack t

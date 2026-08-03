@@ -74,11 +74,11 @@ handleImage st cid respond = do
         _ -> withTempFile ("ygo-" ++ cid ++ ".webp") $ \webpFile -> do
           dl <- try (downloadWebp (asManager st) cid webpFile) :: IO (Either SomeException DownloadResult)
           case dl of
-            Left _ -> respond (responseLBS status500 [] "internal error")
+            Left _ -> respond (responseLBS status500 [] "internal error, download failed")
             Right DownloadNotFound -> do
               setNotExist (asDb st) cid now
               respond (responseLBS status404 [] "not found")
-            Right DownloadHttpError -> respond (responseLBS status500 [] "internal error")
+            Right DownloadHttpError -> respond (responseLBS status500 [] "internal error, download http error")
             Right DownloadOk ->
               withTempFileOnError ("ygo-" ++ cid ++ ".jpg") $ \jpgFile -> do
                 callProcess "magick" [webpFile, jpgFile]
@@ -86,7 +86,7 @@ handleImage st cid respond = do
                 writeChan (asChan st) (cid, jpgFile)
                 respond (responseLBS status200 [("Content-Type", "image/jpeg")] img)
               `catch` \(_ :: SomeException) ->
-                respond (responseLBS status500 [] "internal error")
+                respond (responseLBS status500 [] "internal error, magick exception")
 
 data DownloadResult = DownloadOk | DownloadNotFound | DownloadHttpError
 
@@ -147,6 +147,6 @@ parseId :: Text -> Maybe String
 parseId name = do
   s <- T.stripSuffix ".jpg" name
   let str = T.unpack s
-  if not (null str) && length str <= 10 && all isDigit str
-    then Just str
-    else Nothing
+  if not (null str) && length str <= 10 && all isDigit str then
+    Just str
+  else Nothing

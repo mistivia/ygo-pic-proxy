@@ -11,3 +11,5 @@ tmp/
 result
 config.ini
 .basher/
+tarball/
+rootfs/
