@@ -27,11 +27,11 @@ import System.IO (hClose, openTempFile)
 import System.Process (callProcess)
 import Text.Read (readMaybe)
 
-data AppState = AppState
-  { asChan    :: Chan (String, FilePath)
-  , asDb      :: Connection
-  , asManager :: Manager
-  }
+data AppState = AppState{
+  asChan    :: Chan (String, FilePath),
+  asDb      :: Connection,
+  asManager :: Manager
+}
 
 newAppState :: IO AppState
 newAppState = do

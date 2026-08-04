@@ -7,7 +7,7 @@
 例如，我想看 Servant.Client 中 runClientM 的类型签名：
 
 ```
-cat << EOF | ghci
+cat << EOF | cabal repl
 import Servant.Client (runClientM)
 :t runClientM
 EOF
@@ -18,7 +18,7 @@ EOF
 和上面类似，但是使用 :i
 
 ```
-cat << EOF | ghci
+cat << EOF | cabal repl
 import Data.Text
 :i Text
 EOF

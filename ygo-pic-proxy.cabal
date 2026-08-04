@@ -7,7 +7,7 @@ library
     hs-source-dirs:     src
     exposed-modules:    YgoPicProxy
     build-depends:
-        base >= 4.14 && < 5,
+        base,
         bytestring,
         containers,
         directory,
@@ -20,31 +20,31 @@ library
         text,
         time,
         wai
-    default-language:   GHC2021
+    default-language:   GHC2024
 
 executable ygo-pic-proxy
     main-is:          Main.hs
     hs-source-dirs:   app
     build-depends:
-        base >= 4.14 && < 5,
+        base,
         ini,
         text,
         ygo-pic-proxy,
         wai,
         warp
-    default-language:   GHC2021
-    ghc-options:      -Wall
+    default-language:   GHC2024
+    ghc-options:      -Wall -threaded
 
-test-suite test
+test-suite unit-test
     type:               exitcode-stdio-1.0
     hs-source-dirs:     test
     main-is:            Spec.hs
     build-depends:
-        base >= 4.14 && < 5,
+        base,
         HUnit,
         ygo-pic-proxy,
         text
-    default-language:   GHC2021
+    default-language:   GHC2024
 
 
 test-suite integration
@@ -52,7 +52,7 @@ test-suite integration
     hs-source-dirs:     test
     main-is:            Integration.hs
     build-depends:
-        base >= 4.14 && < 5,
+        base,
         bytestring,
         directory,
         filepath,
@@ -66,4 +66,5 @@ test-suite integration
         wai,
         warp,
         ygo-pic-proxy
-    default-language:   GHC2021
+    default-language:   GHC2024
+    ghc-options:      -Wall -threaded
