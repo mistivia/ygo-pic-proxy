@@ -8,7 +8,6 @@ import crypto from 'node:crypto';
 import { initApp, createApp, worker } from '../src/ygoPicProxy.js';
 import { openDb } from '../src/data_access.js';
 
-// 在独立临时目录中启动服务，测试结束时自动清理（对齐 Haskell Integration.hs 的 withServer）
 async function withServer(fn) {
   const dir = path.join(
     os.tmpdir(),
