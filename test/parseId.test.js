@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseId } from '../src/ygoPicProxy.js';
+import { parseId } from '../src/ygo-pic-proxy.js';
 
 test('valid id', () => {
   assert.equal(parseId('12345.jpg'), '12345');
