@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { openDb } from './data_access.js';
-import { createLogger } from './logger.js';
+import { makeLogger } from './logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -68,10 +68,10 @@ function Chan(size) {
 
 // ---- app state ----
 
-async function initApp(opts = {}) {
+async function makeappRt(opts = {}) {
   const cacheDir = opts.cacheDir ?? 'cache';
   const dbPath = opts.dbPath ?? 'ygo-pic-proxy.db';
-  const logger = createLogger(opts.logLevel ?? 'info');
+  const logger = makeLogger(opts.logLevel ?? 'info');
 
   await fs.mkdir(cacheDir, { recursive: true });
 
@@ -159,20 +159,20 @@ function sendImage(res, buffer) {
 
 // ---- core request handling ----
 
-async function handleImage(app, cid, res) {
-  const cacheFile = path.join(app.cacheDir, `${cid}.jpg`);
+async function handleImage(appRt, cid, res) {
+  const cacheFile = path.join(appRt.cacheDir, `${cid}.jpg`);
 
   if (await fileExists(cacheFile)) {
-    app.logger.debug(`cid=${cid} cache hit, serving ${cacheFile}`);
+    appRt.logger.debug(`cid=${cid} cache hit, serving ${cacheFile}`);
     await sendCachedFile(res, cacheFile);
     return;
   }
-  app.logger.debug(`cid=${cid} cache miss`);
+  appRt.logger.debug(`cid=${cid} cache miss`);
 
   const now = Math.floor(Date.now() / 1000);
-  const ts = app.db.getNotExist(cid);
+  const ts = appRt.db.getNotExist(cid);
   if (ts !== null && now - ts < NOT_EXIST_TTL_SECONDS) {
-    app.logger.debug(`cid=${cid} remembered as not-exist (ts=${ts}), skipping upstream`);
+    appRt.logger.debug(`cid=${cid} remembered as not-exist (ts=${ts}), skipping upstream`);
     notFound(res);
     return;
   }
@@ -180,11 +180,11 @@ async function handleImage(app, cid, res) {
   await withFile(tempFilePath(`ygo-${cid}`, '.webp'), async (webpFile) => {
     let result;
     try {
-      app.logger.debug(`cid=${cid} downloading webp -> ${webpFile}`);
+      appRt.logger.debug(`cid=${cid} downloading webp -> ${webpFile}`);
       result = await downloadWebp(cid, webpFile);
-      app.logger.debug(`cid=${cid} download result=${result}`);
+      appRt.logger.debug(`cid=${cid} download result=${result}`);
     } catch (err) {
-      app.logger.warn(`cid=${cid} download failed: ${err.message}`);
+      appRt.logger.warn(`cid=${cid} download failed: ${err.message}`);
       serverError(res, 'internal error, download failed');
       return;
     }
@@ -201,14 +201,14 @@ async function handleImage(app, cid, res) {
 
     const jpgFile = tempFilePath(`ygo-${cid}`, '.jpg');
     try {
-      app.logger.debug(`cid=${cid} converting webp -> jpg ${jpgFile}`);
+      appRt.logger.debug(`cid=${cid} converting webp -> jpg ${jpgFile}`);
       await runMagick(webpFile, jpgFile);
       const img = await fs.readFile(jpgFile);
-      app.logger.debug(`cid=${cid} conversion ok, queueing ${jpgFile} for caching`);
-      await app.chan.send({ cid, jpgFile });
+      appRt.logger.debug(`cid=${cid} conversion ok, queueing ${jpgFile} for caching`);
+      await appRt.chan.send({ cid, jpgFile });
       sendImage(res, img);
     } catch (err) {
-      app.logger.warn(`cid=${cid} magick failed: ${err.message}`);
+      appRt.logger.warn(`cid=${cid} magick failed: ${err.message}`);
       await removeQuietly(jpgFile);
       serverError(res, 'internal error, magick exception');
     }
@@ -217,10 +217,10 @@ async function handleImage(app, cid, res) {
 
 // ---- express app ----
 
-function createApp(app) {
-  const expressApp = express();
-  expressApp.disable('x-powered-by');
-  expressApp.disable('etag');
+function makeApp(appRt) {
+  const app = express();
+  app.disable('x-powered-by');
+  app.disable('etag');
 
   expressApp.use((req, res) => {
     const p = req.path.startsWith('/') ? req.path.slice(1) : req.path;
@@ -233,7 +233,7 @@ function createApp(app) {
       notFound(res);
       return;
     }
-    handleImage(app, id, res).catch(() => {
+    handleImage(appRt, id, res).catch(() => {
       if (!res.headersSent) {
         res.status(500);
       }
@@ -241,16 +241,16 @@ function createApp(app) {
     });
   });
 
-  return expressApp;
+  return app;
 }
 
 // ---- background worker: moves converted temp files into the disk cache ----
 
-async function worker(app) {
+async function worker(appRt) {
   for (;;) {
-    const { cid, jpgFile } = await app.chan.recv();
+    const { cid, jpgFile } = await appRt.chan.recv();
     await withFile(jpgFile, async (file) => {
-      const cacheFile = path.join(app.cacheDir, `${cid}.jpg`);
+      const cacheFile = path.join(appRt.cacheDir, `${cid}.jpg`);
       if (!(await fileExists(cacheFile))) {
         try {
           await fs.copyFile(file, cacheFile);
@@ -260,4 +260,4 @@ async function worker(app) {
   }
 }
 
-export { parseId, initApp, createApp, worker };
+export { parseId, makeappRt, makeApp, worker };

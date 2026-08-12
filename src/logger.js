@@ -1,6 +1,6 @@
 const LEVEL_ORDER = { error: 0, warn: 1, info: 2, debug: 3 };
 
-function createLogger(levelName) {
+function makeLogger(levelName) {
   const threshold = LEVEL_ORDER[levelName] ?? LEVEL_ORDER.info;
 
   function write(name, args) {
@@ -30,4 +30,4 @@ function createLogger(levelName) {
   return self;
 }
 
-export { createLogger };
+export { makeLogger };

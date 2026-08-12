@@ -1,4 +1,4 @@
-import { initApp, createApp, worker } from './src/ygoPicProxy.js';
+import { makeappRt, makeApp, worker } from './src/ygoPicProxy.js';
 import { loadSettings } from './src/config.js';
 import { Left } from './src/utils.js';
 
@@ -11,15 +11,15 @@ async function main() {
   }
   const settings = settingsResult.value;
 
-  const app = await initApp({ logLevel: settings.logLevel });
+  const appRt = await makeappRt({ logLevel: settings.logLevel });
 
-  worker(app);
-  const expressApp = createApp(app);
-  const httpServer = expressApp.listen(settings.port, settings.host, () => {
-    app.logger.info(`ygo-pic-proxy listening on ${settings.host}:${settings.port}`);
+  worker(appRt);
+  const app = makeApp(appRt);
+  const httpServer = app.listen(settings.port, settings.host, () => {
+    appRt.logger.info(`ygo-pic-proxy listening on ${settings.host}:${settings.port}`);
   });
   httpServer.on('error', (err) => {
-    app.logger.error(`failed to listen on ${settings.host}:${settings.port}: ${err.message}`);
+    appRt.logger.error(`failed to listen on ${settings.host}:${settings.port}: ${err.message}`);
     process.exit(1);
   });
 }

@@ -62,3 +62,18 @@ function Right(value) {
 - `no-restricted-syntax` 禁止 `ThrowStatement` —— 不准写 `throw`，报错用 `Left`/`Right` 表示
 
 新增代码风格约束时，优先加进 `eslint.config.js` 里用规则强制，而不是只写在文档里靠自觉遵守。
+
+## 每次改完代码要跑的验证
+
+改完代码后，按下面的顺序跑一遍，全部通过才算完成：
+
+1. **Lint**：`npm run lint`。有 lint 错误直接算失败，先修完再往下走。
+2. **单元测试**：`npm test`（只跑 `test/parseId.test.js`，跑得快，覆盖 `parseId` 之类的纯函数逻辑）。
+3. **集成测试**：`npm run test:integration`（跑 `test/integration.test.js`，会真起一个 HTTP server，覆盖缓存命中/未命中、`notexist` 记忆、非法 id、真实上游 CDN 下载转换缓存等场景）。也可以直接用 `npm run test:all` 一次跑完单元 + 集成测试。
+   - 集成测试里有几个用例会真的访问上游 CDN（`cdn.233.momobako.com`），没网络时会自动打印 `SKIP` 跳过，不算失败；但如果本来有网络却被跳过了，要留意是不是环境出了问题。
+   - 每次跑之前/跑完之后记得 `rm -rf cache ygo-pic-proxy.db*` 清理掉本地测试残留的缓存目录和 SQLite 文件，不然可能带着上次的状态干扰下一次验证（这些文件本身在 `.gitignore` 里，不会被提交，但会污染本地这次验证的结果）。
+4. **改动涉及 server.js / 启动流程 / 配置解析时，额外手动起一次真实服务验证**：
+   - 用 `node server.js`（或 `npm run start`）在后台起服务，确认能正常监听且不会秒退（例如端口被占用会走 `httpServer.on('error', ...)`，报错退出而不是静默退出）。
+   - 用 `curl` 打几个请求验证：非法 id（如 `/abc.jpg`）应该 404；一张真实存在的卡片 id（如 `/46986414.jpg`）第一次应该下载转换成功返回 200 且是合法 jpg（可以用 `file` 命令确认），稍等一下 `cache/` 目录下应该出现对应的 `.jpg` 文件，再请求一次应该直接命中缓存。
+   - 验证完记得杀掉起的服务进程，并清理 `cache/`、`ygo-pic-proxy.db*`。
+   - 涉及 `config.ini` 的 `log_level`/`host`/`port` 校验逻辑时，额外测一下非法值（比如错误的 `log_level`）能不能在启动时就报出清晰的错误并以非零退出码结束，而不是静默失败。
