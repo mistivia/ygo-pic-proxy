@@ -1,4 +1,4 @@
-import { makeAppRt, makeApp, worker } from './src/ygoPicProxy.js';
+import { makeAppRt, makeApp, worker } from './src/ygo-pic-proxy.js';
 import { loadSettings } from './src/config.js';
 import { Left } from './src/utils.js';
 

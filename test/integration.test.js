@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { makeAppRt, makeApp, worker } from '../src/ygoPicProxy.js';
-import { openDb } from '../src/dataAccess.js';
+import { makeAppRt, makeApp, worker } from '../src/ygo-pic-proxy.js';
+import { openDb } from '../src/data-access.js';
 
 async function withServer(fn) {
   const dir = path.join(
