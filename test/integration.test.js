@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { makeappRt, makeApp, worker } from '../src/ygoPicProxy.js';
+import { makeAppRt, makeApp, worker } from '../src/ygoPicProxy.js';
 import { openDb } from '../src/data_access.js';
 
 async function withServer(fn) {
@@ -20,7 +20,7 @@ async function withServer(fn) {
 
   let server;
   try {
-    const app = await makeappRt();
+    const app = await makeAppRt();
     worker(app).catch(() => {});
 
     const expressApp = makeApp(app);

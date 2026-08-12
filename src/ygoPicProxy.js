@@ -68,7 +68,7 @@ function Chan(size) {
 
 // ---- app state ----
 
-async function makeappRt(opts = {}) {
+async function makeAppRt(opts = {}) {
   const cacheDir = opts.cacheDir ?? 'cache';
   const dbPath = opts.dbPath ?? 'ygo-pic-proxy.db';
   const logger = makeLogger(opts.logLevel ?? 'info');
@@ -190,7 +190,7 @@ async function handleImage(appRt, cid, res) {
     }
 
     if (result === 'not-found') {
-      app.db.setNotExist(cid, now);
+      appRt.db.setNotExist(cid, now);
       notFound(res);
       return;
     }
@@ -222,7 +222,7 @@ function makeApp(appRt) {
   app.disable('x-powered-by');
   app.disable('etag');
 
-  expressApp.use((req, res) => {
+  app.use((req, res) => {
     const p = req.path.startsWith('/') ? req.path.slice(1) : req.path;
     if (p.includes('/')) {
       notFound(res);
@@ -260,4 +260,4 @@ async function worker(appRt) {
   }
 }
 
-export { parseId, makeappRt, makeApp, worker };
+export { parseId, makeAppRt, makeApp, worker };
