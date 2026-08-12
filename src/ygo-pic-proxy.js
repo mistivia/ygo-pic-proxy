@@ -33,35 +33,34 @@ function Chan(size) {
     items: [],
     recvWaiters: [],
     sendWaiters: [],
-    send: function (item) {
-      return new Promise((cont) => {
-        function deliver() {
-          if (self.recvWaiters.length > 0) {
-            const recvCont = self.recvWaiters.shift();
-            recvCont(item);
-          } else {
-            self.items.push(item);
-          }
-          cont();
-        }
-        if (capacity > 0 && self.items.length >= capacity && self.recvWaiters.length === 0) {
-          self.sendWaiters.push(deliver);
+    send: item => new Promise(cont => {
+      function deliver() {
+        if (self.recvWaiters.length > 0) {
+          const recvCont = self.recvWaiters.shift();
+          recvCont(item);
         } else {
-          deliver();
+          self.items.push(item);
         }
-      });
-    },
-    recv: function () {
+        cont();
+      }
+      if (capacity > 0 && self.items.length >= capacity && self.recvWaiters.length === 0) {
+        self.sendWaiters.push(deliver);
+      } else {
+        deliver();
+      }
+    }),
+    recv: () => new Promise(cont => {
       if (self.items.length > 0) {
         const item = self.items.shift();
         if (self.sendWaiters.length > 0) {
           const sendCont = self.sendWaiters.shift();
           sendCont();
         }
-        return Promise.resolve(item);
+        cont(item);
+      } else {
+        self.recvWaiters.push(cont);
       }
-      return new Promise((cont) => self.recvWaiters.push(cont));
-    },
+    })
   };
   return self;
 }
@@ -81,7 +80,7 @@ async function makeAppRt(opts = {}) {
     db,
     cacheDir,
     logger,
-    chan: Chan(),
+    chan: Chan(128),
   };
 }
 
