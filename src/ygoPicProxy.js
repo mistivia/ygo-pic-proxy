@@ -98,6 +98,14 @@ async function removeQuietly(p) {
   } catch {}
 }
 
+async function withFile(filePath, fn) {
+  try {
+    return await fn(filePath);
+  } finally {
+    await removeQuietly(filePath);
+  }
+}
+
 async function fileExists(p) {
   try {
     await fs.access(p, fsSync.constants.F_OK);
@@ -169,8 +177,7 @@ async function handleImage(app, cid, res) {
     return;
   }
 
-  const webpFile = tempFilePath(`ygo-${cid}`, '.webp');
-  try {
+  await withFile(tempFilePath(`ygo-${cid}`, '.webp'), async (webpFile) => {
     let result;
     try {
       app.logger.debug(`cid=${cid} downloading webp -> ${webpFile}`);
@@ -205,9 +212,7 @@ async function handleImage(app, cid, res) {
       await removeQuietly(jpgFile);
       serverError(res, 'internal error, magick exception');
     }
-  } finally {
-    await removeQuietly(webpFile);
-  }
+  });
 }
 
 // ---- express app ----
@@ -244,16 +249,14 @@ function createApp(app) {
 async function worker(app) {
   for (;;) {
     const { cid, jpgFile } = await app.chan.recv();
-    try {
+    await withFile(jpgFile, async (file) => {
       const cacheFile = path.join(app.cacheDir, `${cid}.jpg`);
       if (!(await fileExists(cacheFile))) {
         try {
-          await fs.copyFile(jpgFile, cacheFile);
+          await fs.copyFile(file, cacheFile);
         } catch {}
       }
-    } finally {
-      await removeQuietly(jpgFile);
-    }
+    });
   }
 }
 

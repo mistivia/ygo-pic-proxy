@@ -13,6 +13,13 @@ export default [
     rules: {
       eqeqeq: ['error', 'always'],
       strict: ['error', 'never'],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ThrowStatement',
+          message: 'Do not throw; return Left(error) or Right(value) instead. See AGENTS.md.',
+        },
+      ],
     },
   },
 ];
