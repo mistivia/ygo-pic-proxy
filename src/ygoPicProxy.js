@@ -118,16 +118,8 @@ function serverError(res, message) {
 }
 
 async function sendCachedFile(res, cacheFile) {
-  const stat = await fs.stat(cacheFile);
-  res.status(200);
-  res.set('Content-Type', 'image/jpeg');
-  res.set('Content-Length', String(stat.size));
-  await new Promise((resolve, reject) => {
-    const stream = fsSync.createReadStream(cacheFile);
-    stream.on('error', reject);
-    stream.on('end', resolve);
-    stream.pipe(res);
-  });
+  const sendFile = promisify(res.sendFile.bind(res));
+  await sendFile(path.resolve(cacheFile), { headers: { 'Content-Type': 'image/jpeg' } });
 }
 
 function sendImage(res, buffer) {
