@@ -25,25 +25,42 @@ function parseId(name) {
   return null;
 }
 
-// ---- simple FIFO async channel ----
+// ---- simple FIFO async channel (size <= 0 is unbounded, otherwise bounded) ----
 
-function Chan() {
+function Chan(size) {
+  const capacity = size ?? 0;
   let self = {
     items: [],
-    waiters: [],
+    recvWaiters: [],
+    sendWaiters: [],
     send: function (item) {
-      if (self.waiters.length > 0) {
-        const resolve = self.waiters.shift();
-        resolve(item);
-      } else {
-        self.items.push(item);
-      }
+      return new Promise((cont) => {
+        function deliver() {
+          if (self.recvWaiters.length > 0) {
+            const recvCont = self.recvWaiters.shift();
+            recvCont(item);
+          } else {
+            self.items.push(item);
+          }
+          cont();
+        }
+        if (capacity > 0 && self.items.length >= capacity && self.recvWaiters.length === 0) {
+          self.sendWaiters.push(deliver);
+        } else {
+          deliver();
+        }
+      });
     },
     recv: function () {
       if (self.items.length > 0) {
-        return Promise.resolve(self.items.shift());
+        const item = self.items.shift();
+        if (self.sendWaiters.length > 0) {
+          const sendCont = self.sendWaiters.shift();
+          sendCont();
+        }
+        return Promise.resolve(item);
       }
-      return new Promise((resolve) => self.waiters.push(resolve));
+      return new Promise((cont) => self.recvWaiters.push(cont));
     },
   };
   return self;
@@ -181,7 +198,7 @@ async function handleImage(app, cid, res) {
       await runMagick(webpFile, jpgFile);
       const img = await fs.readFile(jpgFile);
       app.logger.debug(`cid=${cid} conversion ok, queueing ${jpgFile} for caching`);
-      app.chan.send({ cid, jpgFile });
+      await app.chan.send({ cid, jpgFile });
       sendImage(res, img);
     } catch (err) {
       app.logger.warn(`cid=${cid} magick failed: ${err.message}`);
