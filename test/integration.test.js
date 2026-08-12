@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { createAppState, createApp, worker } from '../src/ygoPicProxy.js';
+import { initApp, createApp, worker } from '../src/ygoPicProxy.js';
 import { openDb } from '../src/data_access.js';
 
 // 在独立临时目录中启动服务，测试结束时自动清理（对齐 Haskell Integration.hs 的 withServer）
@@ -21,11 +21,11 @@ async function withServer(fn) {
 
   let server;
   try {
-    const state = await createAppState();
-    worker(state).catch(() => {});
+    const app = await initApp();
+    worker(app).catch(() => {});
 
-    const app = createApp(state);
-    server = http.createServer(app);
+    const expressApp = createApp(app);
+    server = http.createServer(expressApp);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const port = server.address().port;
 

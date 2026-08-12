@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { openDb } from './data_access.js';
+import { createLogger } from './logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -24,13 +25,13 @@ function parseId(name) {
   return null;
 }
 
-// ---- simple FIFO async queue (Chan equivalent) ----
+// ---- simple FIFO async channel ----
 
-function AsyncQueue() {
+function Chan() {
   let self = {
     items: [],
     waiters: [],
-    push: function (item) {
+    send: function (item) {
       if (self.waiters.length > 0) {
         const resolve = self.waiters.shift();
         resolve(item);
@@ -38,7 +39,7 @@ function AsyncQueue() {
         self.items.push(item);
       }
     },
-    pop: function () {
+    recv: function () {
       if (self.items.length > 0) {
         return Promise.resolve(self.items.shift());
       }
@@ -50,9 +51,10 @@ function AsyncQueue() {
 
 // ---- app state ----
 
-async function createAppState(opts = {}) {
+async function initApp(opts = {}) {
   const cacheDir = opts.cacheDir ?? 'cache';
   const dbPath = opts.dbPath ?? 'ygo-pic-proxy.db';
+  const logger = createLogger(opts.logLevel ?? 'info');
 
   await fs.mkdir(cacheDir, { recursive: true });
 
@@ -61,7 +63,8 @@ async function createAppState(opts = {}) {
   return {
     db,
     cacheDir,
-    queue: AsyncQueue(),
+    logger,
+    chan: Chan(),
   };
 }
 
@@ -131,17 +134,20 @@ function sendImage(res, buffer) {
 
 // ---- core request handling ----
 
-async function handleImage(state, cid, res) {
-  const cacheFile = path.join(state.cacheDir, `${cid}.jpg`);
+async function handleImage(app, cid, res) {
+  const cacheFile = path.join(app.cacheDir, `${cid}.jpg`);
 
   if (await fileExists(cacheFile)) {
+    app.logger.debug(`cid=${cid} cache hit, serving ${cacheFile}`);
     await sendCachedFile(res, cacheFile);
     return;
   }
+  app.logger.debug(`cid=${cid} cache miss`);
 
   const now = Math.floor(Date.now() / 1000);
-  const ts = state.db.getNotExist(cid);
+  const ts = app.db.getNotExist(cid);
   if (ts !== null && now - ts < NOT_EXIST_TTL_SECONDS) {
+    app.logger.debug(`cid=${cid} remembered as not-exist (ts=${ts}), skipping upstream`);
     notFound(res);
     return;
   }
@@ -150,14 +156,17 @@ async function handleImage(state, cid, res) {
   try {
     let result;
     try {
+      app.logger.debug(`cid=${cid} downloading webp -> ${webpFile}`);
       result = await downloadWebp(cid, webpFile);
-    } catch {
+      app.logger.debug(`cid=${cid} download result=${result}`);
+    } catch (err) {
+      app.logger.warn(`cid=${cid} download failed: ${err.message}`);
       serverError(res, 'internal error, download failed');
       return;
     }
 
     if (result === 'not-found') {
-      state.db.setNotExist(cid, now);
+      app.db.setNotExist(cid, now);
       notFound(res);
       return;
     }
@@ -168,11 +177,14 @@ async function handleImage(state, cid, res) {
 
     const jpgFile = tempFilePath(`ygo-${cid}`, '.jpg');
     try {
+      app.logger.debug(`cid=${cid} converting webp -> jpg ${jpgFile}`);
       await runMagick(webpFile, jpgFile);
       const img = await fs.readFile(jpgFile);
-      state.queue.push({ cid, jpgFile });
+      app.logger.debug(`cid=${cid} conversion ok, queueing ${jpgFile} for caching`);
+      app.chan.send({ cid, jpgFile });
       sendImage(res, img);
-    } catch {
+    } catch (err) {
+      app.logger.warn(`cid=${cid} magick failed: ${err.message}`);
       await removeQuietly(jpgFile);
       serverError(res, 'internal error, magick exception');
     }
@@ -183,12 +195,12 @@ async function handleImage(state, cid, res) {
 
 // ---- express app ----
 
-function createApp(state) {
-  const app = express();
-  app.disable('x-powered-by');
-  app.disable('etag');
+function createApp(app) {
+  const expressApp = express();
+  expressApp.disable('x-powered-by');
+  expressApp.disable('etag');
 
-  app.use((req, res) => {
+  expressApp.use((req, res) => {
     const p = req.path.startsWith('/') ? req.path.slice(1) : req.path;
     if (p.includes('/')) {
       notFound(res);
@@ -199,7 +211,7 @@ function createApp(state) {
       notFound(res);
       return;
     }
-    handleImage(state, id, res).catch(() => {
+    handleImage(app, id, res).catch(() => {
       if (!res.headersSent) {
         res.status(500);
       }
@@ -207,16 +219,16 @@ function createApp(state) {
     });
   });
 
-  return app;
+  return expressApp;
 }
 
 // ---- background worker: moves converted temp files into the disk cache ----
 
-async function worker(state) {
+async function worker(app) {
   for (;;) {
-    const { cid, jpgFile } = await state.queue.pop();
+    const { cid, jpgFile } = await app.chan.recv();
     try {
-      const cacheFile = path.join(state.cacheDir, `${cid}.jpg`);
+      const cacheFile = path.join(app.cacheDir, `${cid}.jpg`);
       if (!(await fileExists(cacheFile))) {
         try {
           await fs.copyFile(jpgFile, cacheFile);
@@ -228,4 +240,4 @@ async function worker(state) {
   }
 }
 
-export { parseId, createAppState, createApp, worker };
+export { parseId, initApp, createApp, worker };
