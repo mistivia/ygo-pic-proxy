@@ -10,8 +10,12 @@ async function main() {
   });
 
   const app = createApp(state);
-  app.listen(settings.port, settings.host, () => {
+  const httpServer = app.listen(settings.port, settings.host, () => {
     console.log(`ygo-pic-proxy listening on ${settings.host}:${settings.port}`);
+  });
+  httpServer.on('error', (err) => {
+    console.error(`failed to listen on ${settings.host}:${settings.port}: ${err.message}`);
+    process.exit(1);
   });
 }
 

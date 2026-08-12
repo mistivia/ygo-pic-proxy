@@ -75,9 +75,7 @@ function tempFilePath(prefix, ext) {
 async function removeQuietly(p) {
   try {
     await fs.unlink(p);
-  } catch {
-    // ignore, matches Haskell's removeQuietly (ignores IOException)
-  }
+  } catch {}
 }
 
 async function fileExists(p) {
@@ -230,9 +228,7 @@ async function worker(state) {
       if (!(await fileExists(cacheFile))) {
         try {
           await fs.copyFile(jpgFile, cacheFile);
-        } catch {
-          // ignore, matches Haskell's ignoreIO
-        }
+        } catch {}
       }
     } finally {
       await removeQuietly(jpgFile);

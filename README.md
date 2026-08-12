@@ -1,6 +1,6 @@
 # ygo-pic-proxy (JavaScript / Express 版)
 
-一个轻量的游戏王（Yu-Gi-Oh!）卡片图片代理服务，是 [ygo-pic-proxy](../ygo-pic-proxy)（Haskell 实现）的 JavaScript 重写版，功能完全一致。
+一个轻量的游戏王（Yu-Gi-Oh!）卡片图片代理服务。
 
 上游 CDN 只提供 **webp** 格式的图片，本服务拉取后将 **webp 转为 jpg** 再返回给客户端，并带有本地磁盘缓存与"不存在的卡片"记忆，减少对上游的重复请求。
 
