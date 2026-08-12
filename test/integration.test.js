@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { makeAppRt, makeApp, worker } from '../src/ygoPicProxy.js';
-import { openDb } from '../src/data_access.js';
+import { openDb } from '../src/dataAccess.js';
 
 async function withServer(fn) {
   const dir = path.join(

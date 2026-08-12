@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { openDb } from './data_access.js';
+import { openDb } from './dataAccess.js';
 import { makeLogger } from './logger.js';
 
 const execFileAsync = promisify(execFile);
