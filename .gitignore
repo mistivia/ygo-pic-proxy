@@ -1,0 +1,9 @@
+node_modules/
+cache/
+ygo-pic-proxy.db
+ygo-pic-proxy.db-wal
+ygo-pic-proxy.db-shm
+config.ini
+task.md
+TASK.md
+CLAUDE.md

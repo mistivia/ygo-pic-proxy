@@ -1,0 +1,22 @@
+{
+  "name": "ygo-pic-proxy",
+  "version": "0.1.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/parseId.test.js",
+    "test:integration": "node --test test/integration.test.js",
+    "test:all": "node --test test/*.test.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
+    "ini": "^7.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.8.1",
+    "globals": "^17.11.0"
+  }
+}
